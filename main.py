@@ -1,10 +1,12 @@
 import json
+from decouple import config
 from db import BancoDeDados
 
 
 # Credenciais da API
 # Obtenha a chave no RapidAPI
-API_KEY = "9f1ac5ee81mshe2e6d6433af7ef7p19a5c6jsneddc44a14922"
+API_KEY = config("API_KEY")
+print(API_KEY)
 url = "https://google-flights2.p.rapidapi.com/api/v1/searchFlights"
 
 
