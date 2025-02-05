@@ -1,4 +1,5 @@
 import json
+import requests
 from decouple import config
 from db import BancoDeDados
 
@@ -6,48 +7,40 @@ from db import BancoDeDados
 # Credenciais da API
 # Obtenha a chave no RapidAPI
 API_KEY = config("API_KEY")
-print(API_KEY)
 url = "https://google-flights2.p.rapidapi.com/api/v1/searchFlights"
 
 
 # def buscar_passagens(origem, destino, data_ida, data_volta):
 
-#     headers = {
-#         "X-RapidAPI-Key": API_KEY,
-#         "X-RapidAPI-Host": "google-flights2.p.rapidapi.com"
-#     }
+# headers = {
+#     "X-RapidAPI-Key": API_KEY,
+#     "X-RapidAPI-Host": "google-flights2.p.rapidapi.com"
+# }
 
-#     querystring = {
-#         "departure_id": origem,
-#         "arrival_id": destino,
-#         "outbound_date": data_ida,
-#         "return_date": data_volta,
-#         "travel_class": "ECONOMY",
-#         "adults": "1",
-#         "show_hidden": "1",
-#         "currency": "BRL",
-#         "language_code": "pt-BR",
-#         "country_code": "BR",
+# querystring = {
+#     "departure_id": origem,
+#     "arrival_id": destino,
+#     "outbound_date": data_ida,
+#     "return_date": data_volta,
+#     "travel_class": "ECONOMY",
+#     "adults": "1",
+#     "show_hidden": "1",
+#     "currency": "BRL",
+#     "language_code": "pt-BR",
+#     "country_code": "BR",
 
-#     }
+# }
 
-#     response = requests.get(url, headers=headers, params=querystring)
-#     resultado = response.json()
+# response = requests.get(url, headers=headers, params=querystring)
+# result = response.json()
 
-#     print(resultado['data']['flightOffers'][1])
+# with open('data2.json', 'w', encoding='utf-8') as arquivo:
+#     json.dump(result, arquivo, ensure_ascii=False, indent=4)
 
-#     with open('passagens.json', 'w', encoding='utf-8') as arquivo:
-#     json.dump(resultado, arquivo, ensure_ascii=False, indent=4)
+with open('data2.json', 'r', encoding='utf-8') as arquivo:
+    result = json.load(arquivo)
 
-
-# Exemplo de uso
-# buscar_passagens(origem="SDU.AIRPORT", destino="CGH.AIRPORT",
-#                  data_ida="2025-04-10", data_volta="2025-04-13")
-
-with open('data.json', 'r', encoding='utf-8') as arquivo:
-    dados = json.load(arquivo)
-
-resultado = (dados.get('data')['itineraries'])
+resultado = (result.get('data')['itineraries'])
 
 banco = BancoDeDados()
 
@@ -91,7 +84,9 @@ others_flights_table = (
 banco.criar_tabelas(top_fligths_table)
 banco.criar_tabelas(others_flights_table)
 
+
 for top_flights in resultado['topFlights']:
+
     data_partida = top_flights['departure_time']
     data_chegada = top_flights['arrival_time']
     duracao = top_flights['duration']['text']
@@ -109,13 +104,35 @@ for top_flights in resultado['topFlights']:
                           codigo_aero_partida, aeroporto_chegada, codigo_aero_chegada, companhia, preco)
     )
 
+    mensagem = f'''
+        Data de Partida: {data_partida}
+        Data de Chegada: {data_chegada}
+        Duração: {duracao}
+        Aeroporto de Partida: {codigo_aero_partida} - {aeroporto_partida}
+        Aeroporto de Chegada: {codigo_aero_chegada} - {aeroporto_chegada}
+        Companhia: {companhia}
+        Preço: {preco}'''
+
+    headers = {
+        'Content-Type': 'application/json',
+    }
+    payload_1 = {
+        'session': 'default',
+        'chatId': '5521964149054@c.us',
+        'text': f'{mensagem}',
+    }
+
+    requests.post(
+        url='http://localhost:3000/api/sendText',
+        json=payload_1,
+        headers=headers,
+    )
 
 for flights_results in resultado['otherFlights']:
     flights = flights_results['flights']
     flights_layovers = flights_results['layovers']
     for flights_2 in flights:
         if flights_layovers is None:
-
             codigo_aeroporto_partida_outros_voos = flights_2['departure_airport']['airport_code']
             nome_aeroporto_partida_outros_voos = flights_2['departure_airport']['airport_name']
             data_horario_partida_outros_voos = flights_2['departure_airport']['time']
@@ -129,6 +146,17 @@ for flights_results in resultado['otherFlights']:
 
         else:
             for flights_layovers_results in flights_layovers:
+                codigo_aeroporto_partida_outros_voos = flights_2['departure_airport']['airport_code']
+                nome_aeroporto_partida_outros_voos = flights_2['departure_airport']['airport_name']
+                data_horario_partida_outros_voos = flights_2['departure_airport']['time']
+                companhia_outros_voos = flights_2['airline']
+                preco_outros_voos = flights_results['price']
+
+                codigo_aeroporto_destino_outros_voos = flights_2['arrival_airport']['airport_code']
+                nome_aeroporto_destino_outros_voos = flights_2['arrival_airport']['airport_name']
+                data_horario_chegada_outros_voos = flights_2['arrival_airport']['time']
+                duracao_outros_voos = flights_2['duration']['text']
+
                 duracao_total = flights_results['duration']['text']
                 codigo_aeroporto_escala = flights_layovers_results['airport_code']
                 nome_aeroporto_escala = flights_layovers_results['airport_name']
@@ -138,3 +166,7 @@ for flights_results in resultado['otherFlights']:
             banco.inserir_registros(sql_others_flights, (data_horario_partida_outros_voos, data_horario_chegada_outros_voos, duracao_outros_voos, nome_aeroporto_partida_outros_voos,
                                     codigo_aeroporto_partida_outros_voos, nome_aeroporto_destino_outros_voos, codigo_aeroporto_destino_outros_voos, companhia_outros_voos, nome_aeroporto_escala, preco_outros_voos))
 banco.fechar_conexao()
+
+
+# buscar_passagens(origem='SDU', destino='GRU',
+#                  data_ida='2025-02-06', data_volta='2025-02-08')
